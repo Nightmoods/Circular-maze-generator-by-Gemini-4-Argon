@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Circular Polar Maze — DFS Generator & Explorer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Custom Range Slider Styling */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.25);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px;
+      background-color: #38bdf8;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      border: 2px solid #ffffff;
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background-color: #0ea5e9;
+    }
+
+    /* Canvas Container & Touch handling */
+    #canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+      user-select: none;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      cursor: crosshair;
+    }
+
+    /* Subtle animated glow for buttons */
+    .btn-glow:hover {
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+    }
+    .btn-emerald-glow:hover {
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.4);
+    }
+
+    /* D-Pad button active press effect */
+    .dpad-btn:active {
+      transform: scale(0.92);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+
+  <!-- Top Header Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-900/75 backdrop-blur-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand / Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <i class="fa-solid fa-circle-nodes text-white text-base"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg tracking-tight text-white">PolarMaze</h1>
+            <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30 font-semibold">
+              Recursive DFS
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">
+            Adaptive Concentric Polar Grid Generator &amp; Interactive Pathfinder
+          </p>
+        </div>
+      </div>
+
+      <!-- Live Telemetry Bar -->
+      <div class="flex items-center gap-2 sm:gap-4 bg-slate-950/80 border border-slate-800/90 px-3 py-1.5 rounded-xl">
+        <div class="flex items-center gap-1.5">
+          <i class="fa-regular fa-clock text-sky-400 text-xs"></i>
+          <span class="text-xs text-slate-400 hidden md:inline">Time:</span>
+          <span id="stat-timer" class="font-mono text-xs sm:text-sm font-semibold text-white">00:00</span>
+        </div>
+        <div class="h-3.5 w-[1px] bg-slate-800"></div>
+        <div class="flex items-center gap-1.5">
+          <i class="fa-solid fa-shoe-prints text-emerald-400 text-xs"></i>
+          <span class="text-xs text-slate-400 hidden md:inline">Steps:</span>
+          <span id="stat-steps" class="font-mono text-xs sm:text-sm font-semibold text-emerald-400">0</span>
+        </div>
+        <div class="h-3.5 w-[1px] bg-slate-800"></div>
+        <div class="flex items-center gap-1.5">
+          <i class="fa-solid fa-route text-amber-400 text-xs"></i>
+          <span class="text-xs text-slate-400 hidden md:inline">Optimal:</span>
+          <span id="stat-optimal" class="font-mono text-xs sm:text-sm font-semibold text-amber-400">0</span>
+        </div>
+        <div class="h-3.5 w-[1px] bg-slate-800 hidden sm:block"></div>
+        <div class="hidden sm:flex items-center gap-1.5">
+          <i class="fa-solid fa-table-cells text-purple-400 text-xs"></i>
+          <span class="text-xs text-slate-400 hidden lg:inline">Cells:</span>
+          <span id="stat-cells" class="font-mono text-xs sm:text-sm font-semibold text-purple-400">0</span>
+        </div>
+      </div>
+
+      <!-- Legend Pills -->
+      <div class="hidden lg:flex items-center gap-3 text-xs font-medium">
+        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Entrance (Outer Gap)
+        </span>
+        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+          Exit (Outer Gap)
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-3 sm:py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+
+    <!-- Left/Center: Interactive Polar Maze Canvas Area -->
+    <section class="lg:col-span-8 xl:col-span-8 bg-slate-900/60 border border-slate-800/90 rounded-2xl p-2 sm:p-4 flex flex-col justify-between relative shadow-2xl min-h-[400px] sm:min-h-[560px]">
+      
+      <!-- Top Floating Status & Quick Hints inside Canvas Stage -->
+      <div class="flex flex-wrap items-center justify-between gap-2 px-2 py-1 z-10 pointer-events-none">
+        <div id="status-badge" class="pointer-events-auto inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-slate-950/85 border border-slate-800 text-slate-300 shadow">
+          <span id="status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span id="status-text">Ready — Navigate from Green IN to Red EXIT</span>
+        </div>
+
+        <div class="pointer-events-auto flex items-center gap-1.5">
+          <button id="btn-hint" title="Flash Next 4 Steps" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center gap-1.5">
+            <i class="fa-regular fa-lightbulb"></i>
+            <span>Hint</span>
+          </button>
+          <button id="btn-reset-player" title="Return Player to Entrance" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Restart</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Canvas Wrapper -->
+      <div id="canvas-wrapper" class="flex-1 my-1">
+        <canvas id="maze-canvas"></canvas>
+
+        <!-- Victory Modal Overlay (Hidden until solved) -->
+        <div id="victory-modal" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md rounded-xl flex items-center justify-center p-4 z-20 animate-fade-in">
+          <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl">
+            <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-emerald-500/20">
+              <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-1">Maze Escaped!</h2>
+            <p class="text-sm text-slate-400 mb-5">
+              You navigated from the outer entrance to the exit gap!
+            </p>
+
+            <div class="grid grid-cols-3 gap-2.5 mb-6 bg-slate-950/90 p-3.5 rounded-xl border border-slate-800">
+              <div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-400">Time</div>
+                <div id="modal-time" class="font-mono text-base font-bold text-sky-400 mt-0.5">00:12</div>
+              </div>
+              <div class="border-x border-slate-800">
+                <div class="text-[11px] uppercase tracking-wider text-slate-400">Your Steps</div>
+                <div id="modal-steps" class="font-mono text-base font-bold text-emerald-400 mt-0.5">42</div>
+              </div>
+              <div>
+                <div class="text-[11px] uppercase tracking-wider text-slate-400">Efficiency</div>
+                <div id="modal-efficiency" class="font-mono text-base font-bold text-amber-400 mt-0.5">95%</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button id="modal-btn-replay" class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm transition">
+                Replay Same
+              </button>
+              <button id="modal-btn-new" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 transition">
+                New Random Maze
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Canvas Footer: Controls Guide -->
+      <div class="flex flex-wrap items-center justify-between gap-2 px-2 pt-1 text-xs text-slate-400 border-t border-slate-800/60">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-sky-400"></i>
+          <span><strong>Drag / Click</strong> directly along passages, or use <strong>Arrow Keys / WASD</strong></span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1">
+            <span class="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block"></span> Entrance
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span> Exit
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span> Player
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Sidebar: Customization, Generation & Navigation Controls -->
+    <aside class="lg:col-span-4 xl:col-span-4 flex flex-col gap-4">
+
+      <!-- Card 1: Maze Generator & Ring Customization -->
+      <div class="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-sky-400"></i>
+            Maze Parameters
+          </h2>
+          <span id="ring-badge" class="font-mono text-xs px-2.5 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30 font-semibold">
+            10 Rings
+          </span>
+        </div>
+
+        <!-- Concentric Rings Slider -->
+        <div class="mb-4">
+          <div class="flex justify-between text-xs text-slate-400 mb-1.5">
+            <label for="rings-slider" class="font-medium text-slate-300">Concentric Rings</label>
+            <span>Range: 4 – 25</span>
+          </div>
+          <input
+            id="rings-slider"
+            type="range"
+            min="4"
+            max="25"
+            value="10"
+            class="w-full"
+          />
+          <!-- Preset Ring Buttons -->
+          <div class="grid grid-cols-4 gap-1.5 mt-2.5">
+            <button data-rings="6" class="preset-ring-btn py-1 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">
+              Easy (6)
+            </button>
+            <button data-rings="10" class="preset-ring-btn py-1 rounded-lg text-xs font-medium bg-sky-500/20 text-sky-300 border border-sky-500/40 transition">
+              Med (10)
+            </button>
+            <button data-rings="16" class="preset-ring-btn py-1 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">
+              Hard (16)
+            </button>
+            <button data-rings="22" class="preset-ring-btn py-1 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">
+              Max (22)
+            </button>
+          </div>
+        </div>
+
+        <!-- Primary Action Buttons -->
+        <div class="flex flex-col gap-2.5">
+          <button
+            id="btn-generate"
+            class="btn-emerald-glow w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-[0.99] text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2"
+          >
+            <i class="fa-solid fa-shuffle"></i>
+            <span>Generate New Random Maze</span>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              id="btn-animate-dfs"
+              class="btn-glow py-2 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-medium text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <i class="fa-solid fa-play"></i>
+              <span id="animate-btn-label">Watch DFS Carve</span>
+            </button>
+
+            <button
+              id="btn-solution"
+              class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <i class="fa-solid fa-route text-rose-400"></i>
+              <span id="solution-btn-label">Show Solution</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Interactive Navigation Pad & Mode Controls -->
+      <div class="bg-slate-900/70 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-xl flex-1 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <i class="fa-solid fa-gamepad text-emerald-400"></i>
+              Navigation Controls
+            </h2>
+
+            <!-- Control Coordinate Mode Switch -->
+            <button
+              id="btn-control-mode"
+              title="Switch between Screen-Direction and Polar Ring/Sector keyboard mapping"
+              class="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+            >
+              Mode: Screen Dir
+            </button>
+          </div>
+
+          <p id="control-mode-desc" class="text-xs text-slate-400 mb-3 leading-relaxed">
+            Pressing <strong>Up / Down / Left / Right</strong> (or <strong>WASD</strong>) moves toward the passage aligned with that screen direction. You can also drag on the maze.
+          </p>
+
+          <!-- On-Screen Touch / Click D-Pad -->
+          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 mb-3">
+            <div class="grid grid-cols-3 gap-2 max-w-[200px] mx-auto">
+              <div></div>
+              <button
+                data-dir="up"
+                class="dpad-btn h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500/30 border border-slate-700 text-slate-200 flex flex-col items-center justify-center shadow transition"
+              >
+                <i class="fa-solid fa-chevron-up text-sm"></i>
+                <span class="text-[9px] text-slate-400 font-mono" id="dpad-label-up">UP</span>
+              </button>
+              <div></div>
+
+              <button
+                data-dir="left"
+                class="dpad-btn h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500/30 border border-slate-700 text-slate-200 flex flex-col items-center justify-center shadow transition"
+              >
+                <i class="fa-solid fa-chevron-left text-sm"></i>
+                <span class="text-[9px] text-slate-400 font-mono" id="dpad-label-left">LEFT</span>
+              </button>
+
+              <button
+                id="btn-step-auto"
+                title="Auto-step 1 move toward exit"
+                class="dpad-btn h-11 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 flex flex-col items-center justify-center shadow transition"
+              >
+                <i class="fa-solid fa-shoe-prints text-xs"></i>
+                <span class="text-[9px] font-mono">STEP</span>
+              </button>
+
+              <button
+                data-dir="right"
+                class="dpad-btn h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500/30 border border-slate-700 text-slate-200 flex flex-col items-center justify-center shadow transition"
+              >
+                <i class="fa-solid fa-chevron-right text-sm"></i>
+                <span class="text-[9px] text-slate-400 font-mono" id="dpad-label-right">RIGHT</span>
+              </button>
+
+              <div></div>
+              <button
+                data-dir="down"
+                class="dpad-btn h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-sky-500/30 border border-slate-700 text-slate-200 flex flex-col items-center justify-center shadow transition"
+              >
+                <i class="fa-solid fa-chevron-down text-sm"></i>
+                <span class="text-[9px] text-slate-400 font-mono" id="dpad-label-down">DOWN</span>
+              </button>
+              <div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visual Options & Theme Toggles -->
+        <div class="space-y-2 pt-2 border-t border-slate-800/80">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">Show Breadcrumb Trail</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="toggle-trail" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">Highlight Dead-End Backtracks</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="toggle-footprints" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-1">
+            <span class="text-slate-400">Visual Palette</span>
+            <div class="flex items-center gap-1">
+              <button data-theme="cyber" class="theme-btn px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 font-medium">
+                Cyber
+              </button>
+              <button data-theme="blueprint" class="theme-btn px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-medium">
+                Blueprint
+              </button>
+              <button data-theme="paper" class="theme-btn px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-medium">
+                Paper
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <script>
+    /**
+     * ============================================================================
+     * CIRCULAR (POLAR GRID) MAZE GENERATOR & INTERACTIVE PATHFINDER
+     * ============================================================================
+     * Architecture Overview:
+     * 1. PolarGrid Data Structure:
+     *    - Ring 0 is the central circular hub cell (r = 0, c = 0).
+     *    - Rings 1 .. numRings - 1 are concentric rings divided into radial sectors.
+     *    - Adaptive subdivision: as ring radius grows, sectors double when arc width
+     *      exceeds a threshold, keeping cells nearly square in polar space.
+     * 2. Maze Generation (Randomized Depth-First Search / Recursive Backtracker):
+     *    - Visits all cells in the polar graph, carving passages to form a spanning tree.
+     *    - The outer circular boundary is completely closed EXCEPT for two distinct
+     *      perimeter gaps on the outermost ring: Entrance (Green) and Exit (Red).
+     * 3. Interactive Navigation & Solver:
+     *    - Breadth-First Search / Tree Path Resolver computes the unique solution path
+     *      between Entrance and Exit, or between the Player's current cell and Exit.
+     *    - Supports Screen-Space Directional Arrow/WASD navigation, Polar navigation,
+     *      and smooth Mouse/Touch drag-and-click traversal.
+     * ============================================================================
+     */
+
+    // --- Visual Themes ---
+    const THEMES = {
+      cyber: {
+        canvasBg: '#090d16',
+        ringGuide: 'rgba(56, 189, 248, 0.06)',
+        wallColor: '#e2e8f0',
+        outerWallColor: '#38bdf8',
+        visitedFill: 'rgba(56, 189, 248, 0.08)',
+        activeStackFill: 'rgba(244, 63, 94, 0.35)',
+        trailStroke: '#38bdf8',
+        footprintFill: 'rgba(148, 163, 184, 0.12)',
+        solutionStroke: '#f43f5e',
+        hintStroke: '#fbbf24',
+        entranceColor: '#10b981',
+        exitColor: '#f43f5e',
+        playerColor: '#38bdf8',
+        playerCore: '#ffffff',
+        textColor: '#f8fafc'
+      },
+      blueprint: {
+        canvasBg: '#0c2340',
+        ringGuide: 'rgba(255, 255, 255, 0.08)',
+        wallColor: '#bae6fd',
+        outerWallColor: '#ffffff',
+        visitedFill: 'rgba(186, 230, 253, 0.10)',
+        activeStackFill: 'rgba(251, 191, 36, 0.4)',
+        trailStroke: '#34d399',
+        footprintFill: 'rgba(186, 230, 253, 0.14)',
+        solutionStroke: '#fbbf24',
+        hintStroke: '#f472b6',
+        entranceColor: '#34d399',
+        exitColor: '#fb7185',
+        playerColor: '#38bdf8',
+        playerCore: '#ffffff',
+        textColor: '#f0f9ff'
+      },
+      paper: {
+        canvasBg: '#f8fafc',
+        ringGuide: 'rgba(15, 23, 42, 0.06)',
+        wallColor: '#1e293b',
+        outerWallColor: '#0f172a',
+        visitedFill: 'rgba(14, 165, 233, 0.12)',
+        activeStackFill: 'rgba(239, 68, 68, 0.3)',
+        trailStroke: '#0284c7',
+        footprintFill: 'rgba(100, 116, 139, 0.15)',
+        solutionStroke: '#e11d48',
+        hintStroke: '#d97706',
+        entranceColor: '#059669',
+        exitColor: '#e11d48',
+        playerColor: '#0284c7',
+        playerCore: '#ffffff',
+        textColor: '#0f172a'
+      }
+    };
+
+    // --- Application State ---
+    const state = {
+      numRings: 10,             // Total concentric rings (including center hub r=0)
+      rows: [],                 // 2D array: rows[r][c] -> Cell object
+      totalCells: 0,
+      entranceCell: null,       // Outermost ring cell for Entrance gap
+      exitCell: null,           // Outermost ring cell for Exit gap
+      playerCell: null,         // Current cell occupied by player
+      playerVisualPos: { x: 0, y: 0 }, // Smoothly interpolated canvas coords
+      playerTrail: [],          // Ordered stack of cells from entrance to playerCell
+      visitedFootprints: new Set(), // All cells the player has stepped into
+      solutionPath: [],         // Shortest path from entranceCell to exitCell
+      hintPath: [],             // Temporary hint path from playerCell toward exitCell
+      hintTimeout: null,
+      showSolution: false,
+      showTrail: true,
+      showFootprints: true,
+      controlMode: 'screen',    // 'screen' (Up/Down/Left/Right) or 'polar' (In/Out/CCW/CW)
+      theme: 'cyber',
+
+      // Generation animation state
+      isGenerating: false,
+      dfsStack: [],
+      dfsCurrent: null,
+      animFrameId: null,
+
+      // Gameplay metrics
+      stepsCount: 0,
+      startTime: null,
+      elapsedSeconds: 0,
+      timerInterval: null,
+      hasWon: false,
+
+      // Pointer / Drag interaction state
+      isPointerDown: false,
+      hoverCell: null
+    };
+
+    // --- DOM Elements ---
+    const canvas = document.getElementById('maze-canvas');
+    const ctx = canvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+
+    const ringsSlider = document.getElementById('rings-slider');
+    const ringBadge = document.getElementById('ring-badge');
+    const presetRingBtns = document.querySelectorAll('.preset-ring-btn');
+
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnAnimateDfs = document.getElementById('btn-animate-dfs');
+    const animateBtnLabel = document.getElementById('animate-btn-label');
+    const btnSolution = document.getElementById('btn-solution');
+    const solutionBtnLabel = document.getElementById('solution-btn-label');
+    const btnHint = document.getElementById('btn-hint');
+    const btnResetPlayer = document.getElementById('btn-reset-player');
+    const btnControlMode = document.getElementById('btn-control-mode');
+    const controlModeDesc = document.getElementById('control-mode-desc');
+    const btnStepAuto = document.getElementById('btn-step-auto');
+
+    const toggleTrail = document.getElementById('toggle-trail');
+    const toggleFootprints = document.getElementById('toggle-footprints');
+    const themeBtns = document.querySelectorAll('.theme-btn');
+
+    const statTimer = document.getElementById('stat-timer');
+    const statSteps = document.getElementById('stat-steps');
+    const statOptimal = document.getElementById('stat-optimal');
+    const statCells = document.getElementById('stat-cells');
+
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    const victoryModal = document.getElementById('victory-modal');
+    const modalTime = document.getElementById('modal-time');
+    const modalSteps = document.getElementById('modal-steps');
+    const modalEfficiency = document.getElementById('modal-efficiency');
+    const modalBtnReplay = document.getElementById('modal-btn-replay');
+    const modalBtnNew = document.getElementById('modal-btn-new');
+
+    // Layout geometry cache (recomputed on resize)
+    const geom = {
+      cx: 0,
+      cy: 0,
+      maxRadius: 0,
+      ringStep: 0,
+      dpr: 1
+    };
+
+    /**
+     * Represents a single cell `(r, c)` inside the Polar Grid.
+     */
+    class PolarCell {
+      constructor(r, c) {
+        this.r = r;
+        this.c = c;
+        this.id = `${r}:${c}`;
+        this.visited = false;
+        this.links = new Set(); // Set of linked PolarCell instances
+
+        // Polar topology neighbors
+        this.cw = null;         // Clockwise neighbor in same ring
+        this.ccw = null;        // Counter-clockwise neighbor in same ring
+        this.inward = null;     // Inward parent cell in ring r - 1
+        this.outward = [];      // Outward child cell(s) in ring r + 1
+
+        // Angular bounds in radians [0, 2*PI)
+        this.thetaStart = 0;
+        this.thetaEnd = Math.PI * 2;
+        this.thetaMid = 0;
+      }
+
+      /**
+       * Carves a bidirectional passage between this cell and `other`.
+       */
+      link(other) {
+        this.links.add(other);
+        other.links.add(this);
+      }
+
+      /**
+       * Returns true if a passage exists between this cell and `other`.
+       */
+      isLinked(other) {
+        return other && this.links.has(other);
+      }
+
+      /**
+       * Returns all topological neighbors in the polar grid.
+       */
+      neighbors() {
+        const list = [];
+        if (this.inward) list.push(this.inward);
+        if (this.cw) list.push(this.cw);
+        if (this.ccw) list.push(this.ccw);
+        for (const out of this.outward) {
+          list.push(out);
+        }
+        return list;
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 1. POLAR GRID INITIALIZATION
+     * ============================================================================
+     * Builds concentric rings `r = 0 .. numRings - 1` using adaptive subdivision
+     * so sectors never become overly stretched or pinched.
+     */
+    function buildPolarGrid(numRings) {
+      const rows = [];
+      let totalCells = 0;
+
+      // Ring 0: Single central circular cell
+      const centerCell = new PolarCell(0, 0);
+      rows.push([centerCell]);
+      totalCells += 1;
+
+      // Ring 1 starts with 8 sectors around the center cell
+      const baseSectors = 8;
+
+      for (let r = 1; r < numRings; r++) {
+        const prevCount = rows[r - 1].length;
+        let count = prevCount;
+
+        if (r === 1) {
+          count = baseSectors;
+        } else {
+          // Adaptive subdivision: estimate arc length at inner radius of ring r
+          // Normalized ring height = 1 unit; circumference = 2 * PI * r
+          const estimatedArcWidth = (2 * Math.PI * r) / prevCount;
+          if (estimatedArcWidth >= 1.75) {
+            count = prevCount * 2;
+          }
+        }
+
+        const ring = [];
+        const angleStep = (Math.PI * 2) / count;
+
+        for (let c = 0; c < count; c++) {
+          const cell = new PolarCell(r, c);
+          cell.thetaStart = c * angleStep;
+          cell.thetaEnd = (c + 1) * angleStep;
+          cell.thetaMid = (c + 0.5) * angleStep;
+          ring.push(cell);
+          totalCells++;
+        }
+        rows.push(ring);
+      }
+
+      // Wire topological relationships (CW, CCW, Inward, Outward)
+      for (let r = 1; r < numRings; r++) {
+        const ring = rows[r];
+        const count = ring.length;
+        const prevRing = rows[r - 1];
+        const ratio = count / prevRing.length;
+
+        for (let c = 0; c < count; c++) {
+          const cell = ring[c];
+          // Clockwise & Counter-Clockwise within same ring
+          cell.cw = ring[(c + 1) % count];
+          cell.ccw = ring[(c - 1 + count) % count];
+
+          // Inward parent in ring r - 1
+          const parentIndex = Math.floor(c / ratio);
+          const parentCell = prevRing[parentIndex];
+          cell.inward = parentCell;
+          parentCell.outward.push(cell);
+        }
+      }
+
+      state.rows = rows;
+      state.totalCells = totalCells;
+      statCells.textContent = totalCells;
+
+      // Select Entrance and Exit cells on the outermost ring
+      const outerRing = rows[numRings - 1];
+      const outerCount = outerRing.length;
+
+      // Place Entrance near the top-left / left and Exit roughly opposite across the perimeter
+      const entranceIdx = Math.floor(Math.random() * outerCount);
+      // Offset by ~half the perimeter plus a small random jitter so it's distinct & well-separated
+      const jitter = Math.floor((Math.random() - 0.5) * Math.max(2, Math.floor(outerCount * 0.15)));
+      const exitIdx = (entranceIdx + Math.floor(outerCount / 2) + jitter + outerCount) % outerCount;
+
+      state.entranceCell = outerRing[entranceIdx];
+      state.exitCell = outerRing[exitIdx === entranceIdx ? (entranceIdx + Math.floor(outerCount / 2)) % outerCount : exitIdx];
+    }
+
+    /**
+     * ============================================================================
+     * 2. RANDOMIZED DEPTH-FIRST SEARCH (RECURSIVE BACKTRACKER)
+     * ============================================================================
+     */
+    function generateMazeInstant() {
+      cancelAnimation();
+      buildPolarGrid(state.numRings);
+
+      // Start DFS from a random cell to produce unbiased winding passages
+      const startRow = state.rows[Math.floor(Math.random() * state.numRings)];
+      const startCell = startRow[Math.floor(Math.random() * startRow.length)];
+
+      const stack = [startCell];
+      startCell.visited = true;
+
+      while (stack.length > 0) {
+        const current = stack[stack.length - 1];
+        const unvisited = current.neighbors().filter(n => !n.visited);
+
+        if (unvisited.length > 0) {
+          // Pick random unvisited neighbor
+          const next = unvisited[Math.floor(Math.random() * unvisited.length)];
+          current.link(next);
+          next.visited = true;
+          stack.push(next);
+        } else {
+          stack.pop();
+        }
+      }
+
+      onMazeGenerationComplete();
+    }
+
+    /**
+     * Animated step-by-step Randomized Depth-First Search so users can watch
+     * the recursive backtracker carve the circular maze in real time.
+     */
+    function startAnimatedMazeGeneration() {
+      if (state.isGenerating) {
+        // Finish immediately if clicked while already animating
+        finishAnimatedGenerationInstantly();
+        return;
+      }
+
+      cancelAnimation();
+      buildPolarGrid(state.numRings);
+
+      state.isGenerating = true;
+      state.showSolution = false;
+      updateSolutionButtonUI();
+      victoryModal.classList.add('hidden');
+
+      animateBtnLabel.textContent = 'Skip to End';
+      setStatus('Carving polar maze via Randomized DFS...', 'amber');
+
+      // Start from the Entrance cell so the user watches it branch inward
+      const startCell = state.entranceCell;
+      startCell.visited = true;
+      state.dfsStack = [startCell];
+      state.dfsCurrent = startCell;
+
+      // Reset player at entrance while generating
+      state.playerCell = state.entranceCell;
+      state.playerTrail = [state.entranceCell];
+      state.visitedFootprints = new Set([state.entranceCell.id]);
+      syncPlayerVisualPos(true);
+
+      // Speed scales automatically with total cell count
+      const stepsPerFrame = Math.max(1, Math.ceil(state.totalCells / 140));
+
+      function stepAnimation() {
+        if (!state.isGenerating) return;
+
+        for (let i = 0; i < stepsPerFrame; i++) {
+          if (state.dfsStack.length === 0) {
+            state.isGenerating = false;
+            state.dfsCurrent = null;
+            animateBtnLabel.textContent = 'Watch DFS Carve';
+            onMazeGenerationComplete();
+            return;
+          }
+
+          const current = state.dfsStack[state.dfsStack.length - 1];
+          state.dfsCurrent = current;
+          const unvisited = current.neighbors().filter(n => !n.visited);
+
+          if (unvisited.length > 0) {
+            const next = unvisited[Math.floor(Math.random() * unvisited.length)];
+            current.link(next);
+            next.visited = true;
+            state.dfsStack.push(next);
+          } else {
+            state.dfsStack.pop();
+          }
+        }
+
+        requestRender();
+        state.animFrameId = requestAnimationFrame(stepAnimation);
+      }
+
+      state.animFrameId = requestAnimationFrame(stepAnimation);
+    }
+
+    function finishAnimatedGenerationInstantly() {
+      while (state.dfsStack.length > 0) {
+        const current = state.dfsStack[state.dfsStack.length - 1];
+        const unvisited = current.neighbors().filter(n => !n.visited);
+        if (unvisited.length > 0) {
+          const next = unvisited[Math.floor(Math.random() * unvisited.length)];
+          current.link(next);
+          next.visited = true;
+          state.dfsStack.push(next);
+        } else {
+          state.dfsStack.pop();
+        }
+      }
+      state.isGenerating = false;
+      state.dfsCurrent = null;
+      animateBtnLabel.textContent = 'Watch DFS Carve';
+      onMazeGenerationComplete();
+    }
+
+    function cancelAnimation() {
+      if (state.animFrameId) {
+        cancelAnimationFrame(state.animFrameId);
+        state.animFrameId = null;
+      }
+      state.isGenerating = false;
+      state.dfsCurrent = null;
+      state.dfsStack = [];
+      animateBtnLabel.textContent = 'Watch DFS Carve';
+    }
+
+    /**
+     * Called when maze carving finishes (instant or animated).
+     */
+    function onMazeGenerationComplete() {
+      // Compute shortest path between Entrance and Exit
+      state.solutionPath = findShortestPath(state.entranceCell, state.exitCell);
+      statOptimal.textContent = Math.max(0, state.solutionPath.length - 1);
+
+      resetPlayerToEntrance();
+      setStatus('Ready — Navigate from Green IN to Red EXIT', 'emerald');
+      requestRender();
+    }
+
+    /**
+     * Resets the player back to the Entrance cell and restarts metrics.
+     */
+    function resetPlayerToEntrance() {
+      state.playerCell = state.entranceCell;
+      state.playerTrail = [state.entranceCell];
+      state.visitedFootprints = new Set([state.entranceCell.id]);
+      state.hintPath = [];
+      state.stepsCount = 0;
+      state.hasWon = false;
+      statSteps.textContent = '0';
+      victoryModal.classList.add('hidden');
+
+      resetTimer();
+      syncPlayerVisualPos(true);
+      requestRender();
+    }
+
+    /**
+     * ============================================================================
+     * 3. PATHFINDING (BFS ON SPANNING TREE)
+     * ============================================================================
+     * Finds the unique simple path between `startCell` and `targetCell`.
+     */
+    function findShortestPath(startCell, targetCell) {
+      if (!startCell || !targetCell) return [];
+      const queue = [startCell];
+      const cameFrom = new Map();
+      cameFrom.set(startCell.id, null);
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current === targetCell) break;
+
+        for (const neighbor of current.links) {
+          if (!cameFrom.has(neighbor.id)) {
+            cameFrom.set(neighbor.id, current);
+            queue.push(neighbor);
+          }
+        }
+      }
+
+      if (!cameFrom.has(targetCell.id)) return [];
+
+      const path = [];
+      let curr = targetCell;
+      while (curr) {
+        path.push(curr);
+        curr = cameFrom.get(curr.id);
+      }
+      path.reverse();
+      return path;
+    }
+
+    /**
+     * ============================================================================
+     * 4. GEOMETRY & COORDINATE CONVERSIONS
+     * ============================================================================
+     */
+    function updateCanvasGeometry() {
+      const rect = canvasWrapper.getBoundingClientRect();
+      const size = Math.max(280, Math.min(rect.width, rect.height));
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width = Math.floor(size * dpr);
+      canvas.height = Math.floor(size * dpr);
+      canvas.style.width = `${Math.floor(size)}px`;
+      canvas.style.height = `${Math.floor(size)}px`;
+
+      geom.dpr = dpr;
+      geom.cx = size / 2;
+      geom.cy = size / 2;
+      // Leave generous margin around outer perimeter for Entrance/Exit badges & arrows
+      geom.maxRadius = (size / 2) * 0.80;
+      geom.ringStep = geom.maxRadius / state.numRings;
+
+      syncPlayerVisualPos(true);
+      requestRender();
+    }
+
+    /**
+     * Returns the canvas Cartesian coordinates `(x, y)` of a cell's center.
+     */
+    function getCellCenter(cell) {
+      if (!cell || cell.r === 0) {
+        return { x: geom.cx, y: geom.cy };
+      }
+      const midR = (cell.r + 0.5) * geom.ringStep;
+      return {
+        x: geom.cx + midR * Math.cos(cell.thetaMid),
+        y: geom.cy + midR * Math.sin(cell.thetaMid)
+      };
+    }
+
+    /**
+     * Converts canvas pixel coordinates `(x, y)` to the corresponding PolarCell
+     * (or returns `'EXIT_OUTSIDE'` if near the outside of the exit gap).
+     */
+    function getCellAtPoint(x, y) {
+      const dx = x - geom.cx;
+      const dy = y - geom.cy;
+      const dist = Math.hypot(dx, dy);
+      let angle = Math.atan2(dy, dx);
+      if (angle < 0) angle += Math.PI * 2;
+
+      const rIndex = Math.floor(dist / geom.ringStep);
+
+      // Check if user dragged/clicked just outside the Exit gap
+      if (rIndex >= state.numRings && dist <= geom.maxRadius + geom.ringStep * 1.4) {
+        if (state.exitCell && isAngleInSector(angle, state.exitCell.thetaStart, state.exitCell.thetaEnd)) {
+          return 'EXIT_OUTSIDE';
+        }
+        return null;
+      }
+
+      if (rIndex < 0 || rIndex >= state.numRings) return null;
+      if (rIndex === 0) return state.rows[0][0];
+
+      const ring = state.rows[rIndex];
+      const count = ring.length;
+      const cIndex = Math.floor((angle / (Math.PI * 2)) * count) % count;
+      return ring[cIndex];
+    }
+
+    function isAngleInSector(angle, start, end) {
+      return angle >= start && angle <= end;
+    }
+
+    /**
+     * ============================================================================
+     * 5. PLAYER MOVEMENT & NAVIGATION CONTROLS
+     * ============================================================================
+     */
+    function movePlayerToCell(targetCell) {
+      if (state.isGenerating || state.hasWon || !targetCell) return;
+
+      // Start timer on first move
+      if (state.stepsCount === 0 && !state.timerInterval) {
+        startTimer();
+      }
+
+      state.playerCell = targetCell;
+      state.stepsCount++;
+      statSteps.textContent = state.stepsCount;
+      state.visitedFootprints.add(targetCell.id);
+
+      // Update breadcrumb trail: if stepping back onto the previous cell, pop the trail
+      if (state.playerTrail.length >= 2 && state.playerTrail[state.playerTrail.length - 2] === targetCell) {
+        state.playerTrail.pop();
+      } else {
+        state.playerTrail.push(targetCell);
+      }
+
+      // Clear active hint if player moved
+      if (state.hintPath.length > 0) {
+        state.hintPath = [];
+      }
+
+      syncPlayerVisualPos(false);
+
+      // Check if player reached the Exit cell!
+      if (targetCell === state.exitCell) {
+        triggerVictory();
+      }
+
+      requestRender();
+    }
+
+    /**
+     * Moves player using Screen-Space Direction vector `(vx, vy)` or Polar Direction.
+     */
+    function handleDirectionalInput(direction) {
+      if (state.isGenerating || state.hasWon || !state.playerCell) return;
+
+      const current = state.playerCell;
+
+      if (state.controlMode === 'polar') {
+        // Polar Mode: up = Inward, down = Outward, left = CCW, right = CW
+        let candidate = null;
+        if (direction === 'up') {
+          if (current.r === 0) {
+            // From center cell, pick any linked cell in ring 1
+            const linkedOut = current.outward.filter(c => current.isLinked(c));
+            candidate = linkedOut[0] || null;
+          } else if (current.isLinked(current.inward)) {
+            candidate = current.inward;
+          }
+        } else if (direction === 'down') {
+          if (current === state.exitCell) {
+            triggerVictory();
+            return;
+          }
+          const linkedOut = current.outward.filter(c => current.isLinked(c));
+          candidate = linkedOut[0] || null;
+        } else if (direction === 'left') {
+          if (current.isLinked(current.ccw)) candidate = current.ccw;
+        } else if (direction === 'right') {
+          if (current.isLinked(current.cw)) candidate = current.cw;
+        }
+
+        if (candidate) {
+          movePlayerToCell(candidate);
+        }
+        return;
+      }
+
+      // Screen-Space Directional Mode (Default):
+      // Maps Up/Down/Left/Right to screen vectors and chooses the linked passage
+      // whose direction vector from the current cell center best aligns with the input.
+      const dirVectors = {
+        up: { x: 0, y: -1 },
+        down: { x: 0, y: 1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 }
+      };
+      const inputVec = dirVectors[direction];
+      if (!inputVec) return;
+
+      const currPos = getCellCenter(current);
+      let bestNeighbor = null;
+      let bestDot = 0.18; // Minimum cosine alignment threshold (~79 deg)
+
+      for (const neighbor of current.links) {
+        const nextPos = getCellCenter(neighbor);
+        const dx = nextPos.x - currPos.x;
+        const dy = nextPos.y - currPos.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-4) continue;
+
+        const dot = (dx / len) * inputVec.x + (dy / len) * inputVec.y;
+        if (dot > bestDot) {
+          bestDot = dot;
+          bestNeighbor = neighbor;
+        }
+      }
+
+      if (bestNeighbor) {
+        movePlayerToCell(bestNeighbor);
+      }
+    }
+
+    /**
+     * Smoothly interpolates the player's visual token toward `state.playerCell`.
+     */
+    let playerAnimReq = null;
+    function syncPlayerVisualPos(instant = false) {
+      if (!state.playerCell) return;
+      const target = getCellCenter(state.playerCell);
+
+      if (instant) {
+        state.playerVisualPos.x = target.x;
+        state.playerVisualPos.y = target.y;
+        return;
+      }
+
+      if (playerAnimReq) cancelAnimationFrame(playerAnimReq);
+
+      function animateToken() {
+        const t = getCellCenter(state.playerCell);
+        const dx = t.x - state.playerVisualPos.x;
+        const dy = t.y - state.playerVisualPos.y;
+        if (Math.hypot(dx, dy) < 0.75) {
+          state.playerVisualPos.x = t.x;
+          state.playerVisualPos.y = t.y;
+          requestRender();
+          playerAnimReq = null;
+          return;
+        }
+        state.playerVisualPos.x += dx * 0.34;
+        state.playerVisualPos.y += dy * 0.34;
+        requestRender();
+        playerAnimReq = requestAnimationFrame(animateToken);
+      }
+
+      playerAnimReq = requestAnimationFrame(animateToken);
+    }
+
+    /**
+     * Handles Victory when the player reaches the Exit cell.
+     */
+    function triggerVictory() {
+      if (state.hasWon) return;
+      state.hasWon = true;
+      stopTimer();
+
+      setStatus('Maze Completed! You reached the outer Exit gap!', 'emerald');
+
+      const optimalSteps = Math.max(1, state.solutionPath.length - 1);
+      const userSteps = Math.max(1, state.stepsCount);
+      const efficiency = Math.min(100, Math.round((optimalSteps / userSteps) * 100));
+
+      modalTime.textContent = formatTime(state.elapsedSeconds);
+      modalSteps.textContent = `${state.stepsCount} (Opt: ${optimalSteps})`;
+      modalEfficiency.textContent = `${efficiency}%`;
+
+      requestRender();
+      setTimeout(() => {
+        if (state.hasWon) {
+          victoryModal.classList.remove('hidden');
+        }
+      }, 280);
+    }
+
+    /**
+     * ============================================================================
+     * 6. RENDERING ENGINE (HTML5 CANVAS)
+     * ============================================================================
+     */
+    let renderScheduled = false;
+    function requestRender() {
+      if (!renderScheduled) {
+        renderScheduled = true;
+        requestAnimationFrame(() => {
+          renderScheduled = false;
+          renderMaze();
+        });
+      }
+    }
+
+    function renderMaze() {
+      const palette = THEMES[state.theme];
+      const { cx, cy, ringStep, maxRadius, dpr } = geom;
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+
+      // 1. Background Fill
+      ctx.fillStyle = palette.canvasBg;
+      ctx.fillRect(0, 0, width, height);
+
+      // Subtle decorative polar coordinate radar rings outside & inside
+      ctx.strokeStyle = palette.ringGuide;
+      ctx.lineWidth = 1;
+      for (let r = 1; r <= state.numRings + 1; r++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * ringStep, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (!state.rows || state.rows.length === 0) {
+        ctx.restore();
+        return;
+      }
+
+      // 2. Highlight cell fills (DFS Generation progress or Player Footprints)
+      for (let r = 0; r < state.numRings; r++) {
+        const ring = state.rows[r];
+        for (let c = 0; c < ring.length; c++) {
+          const cell = ring[c];
+
+          if (state.isGenerating && cell.visited) {
+            fillPolarCell(cell, cell === state.dfsCurrent ? palette.activeStackFill : palette.visitedFill);
+          } else if (!state.isGenerating && state.showFootprints && state.visitedFootprints.has(cell.id)) {
+            fillPolarCell(cell, palette.footprintFill);
+          }
+        }
+      }
+
+      // Highlight Entrance & Exit sector subtle radial tint
+      if (state.entranceCell) {
+        fillPolarCell(state.entranceCell, 'rgba(16, 185, 129, 0.20)');
+      }
+      if (state.exitCell) {
+        fillPolarCell(state.exitCell, 'rgba(244, 63, 94, 0.22)');
+      }
+
+      // Hover cell highlight for mouse/touch feedback
+      if (state.hoverCell && state.hoverCell !== 'EXIT_OUTSIDE' && !state.isGenerating) {
+        fillPolarCell(state.hoverCell, 'rgba(56, 189, 248, 0.14)');
+      }
+
+      // 3. Draw Solution Path (if toggled on)
+      if (state.showSolution && state.solutionPath.length > 1) {
+        drawPolarPath(
+          state.solutionPath,
+          palette.solutionStroke,
+          Math.max(2.5, ringStep * 0.22),
+          [6, 4],
+          true
+        );
+      }
+
+      // 4. Draw Temporary Hint Path (if active)
+      if (state.hintPath.length > 1) {
+        drawPolarPath(
+          state.hintPath,
+          palette.hintStroke,
+          Math.max(3, ringStep * 0.25),
+          [],
+          false
+        );
+      }
+
+      // 5. Draw Player Breadcrumb Trail
+      if (state.showTrail && state.playerTrail.length > 1) {
+        drawPolarPath(
+          state.playerTrail,
+          palette.trailStroke,
+          Math.max(2.5, ringStep * 0.24),
+          [],
+          false,
+          true
+        );
+      }
+
+      // 6. Draw Inner Maze Walls (Inward Arcs & Clockwise Radial Segments)
+      const wallThickness = Math.max(1.5, Math.min(3.0, ringStep * 0.11));
+      ctx.strokeStyle = palette.wallColor;
+      ctx.lineWidth = wallThickness;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+
+      for (let r = 1; r < state.numRings; r++) {
+        const ring = state.rows[r];
+        const innerR = r * ringStep;
+        const outerR = (r + 1) * ringStep;
+
+        for (let c = 0; c < ring.length; c++) {
+          const cell = ring[c];
+
+          // Inward arc wall (separates cell from its inward parent)
+          if (!cell.isLinked(cell.inward)) {
+            ctx.moveTo(
+              cx + innerR * Math.cos(cell.thetaStart),
+              cy + innerR * Math.sin(cell.thetaStart)
+            );
+            ctx.arc(cx, cy, innerR, cell.thetaStart, cell.thetaEnd);
+          }
+
+          // Clockwise radial wall (separates cell from its clockwise neighbor)
+          if (!cell.isLinked(cell.cw)) {
+            ctx.moveTo(
+              cx + innerR * Math.cos(cell.thetaEnd),
+              cy + innerR * Math.sin(cell.thetaEnd)
+            );
+            ctx.lineTo(
+              cx + outerR * Math.cos(cell.thetaEnd),
+              cy + outerR * Math.sin(cell.thetaEnd)
+            );
+          }
+        }
+      }
+      ctx.stroke();
+
+      // 7. Draw Outer Boundary Perimeter Circle (Closed except for Entrance & Exit gaps!)
+      const outerRing = state.rows[state.numRings - 1];
+      ctx.strokeStyle = palette.outerWallColor;
+      ctx.lineWidth = Math.max(2.5, wallThickness * 1.35);
+      ctx.beginPath();
+
+      for (let c = 0; c < outerRing.length; c++) {
+        const cell = outerRing[c];
+        // Leave two distinct open gaps on the outer perimeter: Entrance and Exit!
+        if (cell === state.entranceCell || cell === state.exitCell) {
+          continue;
+        }
+        ctx.moveTo(
+          cx + maxRadius * Math.cos(cell.thetaStart),
+          cy + maxRadius * Math.sin(cell.thetaStart)
+        );
+        ctx.arc(cx, cy, maxRadius, cell.thetaStart, cell.thetaEnd);
+      }
+      ctx.stroke();
+
+      // 8. Draw Entrance & Exit Perimeter Markers (Green IN Arrow & Red EXIT Arrow)
+      if (state.entranceCell) {
+        drawPerimeterPortalMarker(state.entranceCell, 'IN', palette.entranceColor, true);
+      }
+      if (state.exitCell) {
+        drawPerimeterPortalMarker(state.exitCell, 'EXIT', palette.exitColor, false);
+      }
+
+      // 9. Draw Player Token
+      if (state.playerCell) {
+        const px = state.playerVisualPos.x;
+        const py = state.playerVisualPos.y;
+        const tokenRadius = Math.max(4, Math.min(11, ringStep * 0.34));
+
+        // Outer halo
+        ctx.fillStyle = palette.playerColor;
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.arc(px, py, tokenRadius * 1.65, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main player circle
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = palette.playerColor;
+        ctx.beginPath();
+        ctx.arc(px, py, tokenRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Crisp white inner core
+        ctx.fillStyle = palette.playerCore;
+        ctx.beginPath();
+        ctx.arc(px, py, tokenRadius * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    /**
+     * Fills a polar sector cell `(r, c)` with the specified color.
+     */
+    function fillPolarCell(cell, color) {
+      const { cx, cy, ringStep } = geom;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+
+      if (cell.r === 0) {
+        ctx.arc(cx, cy, ringStep, 0, Math.PI * 2);
+      } else {
+        const innerR = cell.r * ringStep;
+        const outerR = (cell.r + 1) * ringStep;
+        ctx.arc(cx, cy, outerR, cell.thetaStart, cell.thetaEnd, false);
+        ctx.arc(cx, cy, innerR, cell.thetaEnd, cell.thetaStart, true);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
+
+    /**
+     * Draws a continuous polar path (using circular arcs within rings and radial segments
+     * across rings) so paths never clip through curved walls.
+     */
+    function drawPolarPath(cells, strokeColor, lineWidth, dashArray = [], extendToPortals = false, extendStartOnly = false) {
+      if (!cells || cells.length === 0) return;
+      const { cx, cy, ringStep, maxRadius } = geom;
+
+      ctx.save();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (dashArray.length > 0) {
+        ctx.setLineDash(dashArray);
+      }
+
+      ctx.beginPath();
+
+      // Optionally start outside the Entrance gap
+      const first = cells[0];
+      if ((extendToPortals || extendStartOnly) && first === state.entranceCell) {
+        const outsideR = maxRadius + ringStep * 0.45;
+        const firstMidR = (first.r + 0.5) * ringStep;
+        ctx.moveTo(
+          cx + outsideR * Math.cos(first.thetaMid),
+          cy + outsideR * Math.sin(first.thetaMid)
+        );
+        ctx.lineTo(
+          cx + firstMidR * Math.cos(first.thetaMid),
+          cy + firstMidR * Math.sin(first.thetaMid)
+        );
+      } else {
+        const p0 = getCellCenter(first);
+        ctx.moveTo(p0.x, p0.y);
+      }
+
+      for (let i = 0; i < cells.length - 1; i++) {
+        const a = cells[i];
+        const b = cells[i + 1];
+
+        if (a.r === 0 || b.r === 0) {
+          // Moving into or out of the center circular hub: straight radial line
+          const pb = getCellCenter(b);
+          ctx.lineTo(pb.x, pb.y);
+        } else if (a.r === b.r) {
+          // Same ring: draw a circular arc along mid-radius `midR`
+          const midR = (a.r + 0.5) * ringStep;
+          const isCCW = a.ccw === b;
+          ctx.arc(cx, cy, midR, a.thetaMid, b.thetaMid, isCCW);
+        } else {
+          // Radial move between adjacent rings `a.r` and `b.r`:
+          // If sector count subdivided, align angle in the narrower ring so the doorway is centered
+          const innerCell = a.r < b.r ? a : b;
+          const outerCell = a.r < b.r ? b : a;
+          const doorwayAngle = outerCell.thetaMid;
+
+          const rA = (a.r + 0.5) * ringStep;
+          const rB = (b.r + 0.5) * ringStep;
+
+          if (a === innerCell) {
+            // Arc in inner cell from a.thetaMid to doorwayAngle, then radial line out to b
+            if (Math.abs(a.thetaMid - doorwayAngle) > 1e-4) {
+              const ccw = normalizeAngleDiff(doorwayAngle - a.thetaMid) < 0;
+              ctx.arc(cx, cy, rA, a.thetaMid, doorwayAngle, ccw);
+            }
+            ctx.lineTo(
+              cx + rB * Math.cos(doorwayAngle),
+              cy + rB * Math.sin(doorwayAngle)
+            );
+          } else {
+            // Radial line inward along doorwayAngle to rB, then arc to b.thetaMid
+            ctx.lineTo(
+              cx + rB * Math.cos(doorwayAngle),
+              cy + rB * Math.sin(doorwayAngle)
+            );
+            if (Math.abs(b.thetaMid - doorwayAngle) > 1e-4) {
+              const ccw = normalizeAngleDiff(b.thetaMid - doorwayAngle) < 0;
+              ctx.arc(cx, cy, rB, doorwayAngle, b.thetaMid, ccw);
+            }
+          }
+        }
+      }
+
+      // Optionally extend out through the Exit gap
+      const last = cells[cells.length - 1];
+      if (extendToPortals && last === state.exitCell) {
+        const outsideR = maxRadius + ringStep * 0.45;
+        ctx.lineTo(
+          cx + outsideR * Math.cos(last.thetaMid),
+          cy + outsideR * Math.sin(last.thetaMid)
+        );
+      }
+
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function normalizeAngleDiff(diff) {
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      return diff;
+    }
+
+    /**
+     * Draws a crisp directional arrow & badge at the Entrance or Exit gap on the outer perimeter.
+     */
+    function drawPerimeterPortalMarker(cell, label, color, pointInward) {
+      const { cx, cy, maxRadius, ringStep } = geom;
+      const angle = cell.thetaMid;
+
+      // Draw glowing gate posts on the two corners of the gap
+      const postRadius = Math.max(2.8, Math.min(5, ringStep * 0.16));
+      const p1x = cx + maxRadius * Math.cos(cell.thetaStart);
+      const p1y = cy + maxRadius * Math.sin(cell.thetaStart);
+      const p2x = cx + maxRadius * Math.cos(cell.thetaEnd);
+      const p2y = cy + maxRadius * Math.sin(cell.thetaEnd);
+
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p1x, p1y, postRadius, 0, Math.PI * 2);
+      ctx.arc(p2x, p2y, postRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw radial directional arrow just outside the gap
+      const arrowInnerR = maxRadius + 6;
+      const arrowOuterR = maxRadius + Math.max(20, Math.min(30, ringStep * 1.15));
+
+      const startR = pointInward ? arrowOuterR : arrowInnerR;
+      const tipR = pointInward ? arrowInnerR : arrowOuterR;
+
+      const sx = cx + startR * Math.cos(angle);
+      const sy = cy + startR * Math.sin(angle);
+      const tx = cx + tipR * Math.cos(angle);
+      const ty = cy + tipR * Math.sin(angle);
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+
+      // Arrow shaft
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+
+      // Arrow head
+      const headLen = 7;
+      const dirAngle = pointInward ? angle + Math.PI : angle;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(
+        tx - headLen * Math.cos(dirAngle - Math.PI / 6),
+        ty - headLen * Math.sin(dirAngle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        tx - headLen * Math.cos(dirAngle + Math.PI / 6),
+        ty - headLen * Math.sin(dirAngle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fill();
+
+      // Label Badge ("IN" / "EXIT") positioned outside the arrow
+      const labelR = arrowOuterR + 14;
+      const lx = cx + labelR * Math.cos(angle);
+      const ly = cy + labelR * Math.sin(angle);
+
+      ctx.font = '700 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const textMetrics = ctx.measureText(label);
+      const padX = 5;
+      const boxW = textMetrics.width + padX * 2;
+      const boxH = 16;
+
+      ctx.fillStyle = THEMES[state.theme].canvasBg;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(lx - boxW / 2, ly - boxH / 2, boxW, boxH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = color;
+      ctx.fillText(label, lx, ly + 0.5);
+      ctx.restore();
+    }
+
+    /**
+     * ============================================================================
+     * 7. MOUSE & TOUCH POINTER NAVIGATION
+     * ============================================================================
+     * Allows users to smoothly drag their finger/cursor through passages or click
+     * a nearby cell along a corridor to move the player there.
+     */
+    function getCanvasRelativeCoords(evt) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    function handlePointerInteraction(x, y, maxStepLimit = 3) {
+      if (state.isGenerating || state.hasWon || !state.playerCell) return;
+
+      const target = getCellAtPoint(x, y);
+      if (!target) return;
+
+      if (target === 'EXIT_OUTSIDE' && state.playerCell === state.exitCell) {
+        triggerVictory();
+        return;
+      }
+
+      if (target === 'EXIT_OUTSIDE' || target === state.playerCell) return;
+
+      // If directly linked neighbor, step immediately
+      if (state.playerCell.isLinked(target)) {
+        movePlayerToCell(target);
+        return;
+      }
+
+      // If pointer moved quickly across 2..maxStepLimit open passages, walk the path
+      const path = findShortestPath(state.playerCell, target);
+      if (path.length > 1 && path.length - 1 <= maxStepLimit) {
+        for (let i = 1; i < path.length; i++) {
+          movePlayerToCell(path[i]);
+          if (state.hasWon) break;
+        }
+      }
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      state.isPointerDown = true;
+      const pt = getCanvasRelativeCoords(e);
+      // Allow clicking up to 6 connected corridor cells ahead
+      handlePointerInteraction(pt.x, pt.y, 6);
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        const pt = getCanvasRelativeCoords(e);
+        const hovered = getCellAtPoint(pt.x, pt.y);
+        if (hovered !== state.hoverCell) {
+          state.hoverCell = hovered;
+          requestRender();
+        }
+        if (state.isPointerDown) {
+          handlePointerInteraction(pt.x, pt.y, 4);
+        }
+      } else if (state.hoverCell) {
+        state.hoverCell = null;
+        requestRender();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.isPointerDown = false;
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        e.preventDefault();
+        state.isPointerDown = true;
+        const pt = getCanvasRelativeCoords(e);
+        handlePointerInteraction(pt.x, pt.y, 5);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (state.isPointerDown && e.touches.length === 1) {
+        e.preventDefault();
+        const pt = getCanvasRelativeCoords(e);
+        handlePointerInteraction(pt.x, pt.y, 4);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      state.isPointerDown = false;
+    });
+
+    /**
+     * ============================================================================
+     * 8. TIMER & UI EVENT LISTENERS
+     * ============================================================================
+     */
+    function startTimer() {
+      stopTimer();
+      state.startTime = Date.now() - state.elapsedSeconds * 1000;
+      state.timerInterval = setInterval(() => {
+        state.elapsedSeconds = Math.floor((Date.now() - state.startTime) / 1000);
+        statTimer.textContent = formatTime(state.elapsedSeconds);
+      }, 250);
+    }
+
+    function stopTimer() {
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+    }
+
+    function resetTimer() {
+      stopTimer();
+      state.elapsedSeconds = 0;
+      statTimer.textContent = '00:00';
+    }
+
+    function formatTime(totalSec) {
+      const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const secs = String(totalSec % 60).padStart(2, '0');
+      return `${mins}:${secs}`;
+    }
+
+    function setStatus(message, colorKey = 'emerald') {
+      statusText.textContent = message;
+      statusDot.className = 'w-2 h-2 rounded-full ';
+      if (colorKey === 'amber') {
+        statusDot.classList.add('bg-amber-400', 'animate-ping');
+      } else if (colorKey === 'sky') {
+        statusDot.classList.add('bg-sky-400');
+      } else {
+        statusDot.classList.add('bg-emerald-400');
+      }
+    }
+
+    function updateSolutionButtonUI() {
+      if (state.showSolution) {
+        solutionBtnLabel.textContent = 'Hide Solution';
+        btnSolution.classList.add('bg-rose-500/20', 'border-rose-500/40', 'text-rose-200');
+        btnSolution.classList.remove('bg-slate-800', 'border-slate-700', 'text-slate-200');
+      } else {
+        solutionBtnLabel.textContent = 'Show Solution';
+        btnSolution.classList.remove('bg-rose-500/20', 'border-rose-500/40', 'text-rose-200');
+        btnSolution.classList.add('bg-slate-800', 'border-slate-700', 'text-slate-200');
+      }
+    }
+
+    function updatePresetButtonsUI(rings) {
+      presetRingBtns.forEach(btn => {
+        const val = parseInt(btn.getAttribute('data-rings'), 10);
+        if (val === rings) {
+          btn.className = 'preset-ring-btn py-1 rounded-lg text-xs font-medium bg-sky-500/20 text-sky-300 border border-sky-500/40 transition';
+        } else {
+          btn.className = 'preset-ring-btn py-1 rounded-lg text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition';
+        }
+      });
+    }
+
+    // Slider input
+    ringsSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.numRings = val;
+      ringBadge.textContent = `${val} Rings`;
+      updatePresetButtonsUI(val);
+      updateCanvasGeometry();
+      generateMazeInstant();
+    });
+
+    // Preset Ring Buttons
+    presetRingBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseInt(btn.getAttribute('data-rings'), 10);
+        ringsSlider.value = val;
+        state.numRings = val;
+        ringBadge.textContent = `${val} Rings`;
+        updatePresetButtonsUI(val);
+        updateCanvasGeometry();
+        generateMazeInstant();
+      });
+    });
+
+    // Generate New Maze Button
+    btnGenerate.addEventListener('click', () => {
+      generateMazeInstant();
+    });
+
+    // Watch Animated DFS Button
+    btnAnimateDfs.addEventListener('click', () => {
+      startAnimatedMazeGeneration();
+    });
+
+    // Toggle Solution Button
+    btnSolution.addEventListener('click', () => {
+      state.showSolution = !state.showSolution;
+      updateSolutionButtonUI();
+      requestRender();
+    });
+
+    // Hint Button (flashes next 4 steps from player's current cell toward Exit)
+    btnHint.addEventListener('click', () => {
+      if (state.isGenerating || state.hasWon || !state.playerCell) return;
+      const pathToExit = findShortestPath(state.playerCell, state.exitCell);
+      state.hintPath = pathToExit.slice(0, Math.min(pathToExit.length, 6));
+      requestRender();
+
+      if (state.hintTimeout) clearTimeout(state.hintTimeout);
+      state.hintTimeout = setTimeout(() => {
+        state.hintPath = [];
+        requestRender();
+      }, 2200);
+    });
+
+    // Auto-Step Button (moves 1 step along optimal path toward Exit)
+    btnStepAuto.addEventListener('click', () => {
+      if (state.isGenerating || state.hasWon || !state.playerCell) return;
+      const pathToExit = findShortestPath(state.playerCell, state.exitCell);
+      if (pathToExit.length > 1) {
+        movePlayerToCell(pathToExit[1]);
+      }
+    });
+
+    // Reset Player to Entrance
+    btnResetPlayer.addEventListener('click', () => {
+      if (state.isGenerating) return;
+      resetPlayerToEntrance();
+    });
+
+    // Control Mode Switch (Screen-Space vs Polar)
+    btnControlMode.addEventListener('click', () => {
+      if (state.controlMode === 'screen') {
+        state.controlMode = 'polar';
+        btnControlMode.textContent = 'Mode: Polar Ring';
+        controlModeDesc.innerHTML = '<strong>Up:</strong> Inward Ring &bull; <strong>Down:</strong> Outward Ring &bull; <strong>Left:</strong> Counter-Clockwise &bull; <strong>Right:</strong> Clockwise.';
+        document.getElementById('dpad-label-up').textContent = 'IN';
+        document.getElementById('dpad-label-down').textContent = 'OUT';
+        document.getElementById('dpad-label-left').textContent = 'CCW';
+        document.getElementById('dpad-label-right').textContent = 'CW';
+      } else {
+        state.controlMode = 'screen';
+        btnControlMode.textContent = 'Mode: Screen Dir';
+        controlModeDesc.innerHTML = 'Pressing <strong>Up / Down / Left / Right</strong> (or <strong>WASD</strong>) moves toward the passage aligned with that screen direction. You can also drag on the maze.';
+        document.getElementById('dpad-label-up').textContent = 'UP';
+        document.getElementById('dpad-label-down').textContent = 'DOWN';
+        document.getElementById('dpad-label-left').textContent = 'LEFT';
+        document.getElementById('dpad-label-right').textContent = 'RIGHT';
+      }
+    });
+
+    // On-screen D-Pad Buttons
+    document.querySelectorAll('.dpad-btn[data-dir]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = btn.getAttribute('data-dir');
+        handleDirectionalInput(dir);
+      });
+    });
+
+    // Keyboard Navigation (Arrow Keys & WASD)
+    window.addEventListener('keydown', (e) => {
+      const keyMap = {
+        ArrowUp: 'up',
+        KeyW: 'up',
+        ArrowDown: 'down',
+        KeyS: 'down',
+        ArrowLeft: 'left',
+        KeyA: 'left',
+        ArrowRight: 'right',
+        KeyD: 'right'
+      };
+      const dir = keyMap[e.code];
+      if (dir) {
+        e.preventDefault();
+        handleDirectionalInput(dir);
+      }
+    });
+
+    // Trail & Footprint toggles
+    toggleTrail.addEventListener('change', (e) => {
+      state.showTrail = e.target.checked;
+      requestRender();
+    });
+
+    toggleFootprints.addEventListener('change', (e) => {
+      state.showFootprints = e.target.checked;
+      requestRender();
+    });
+
+    // Visual Theme Buttons
+    themeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const selected = btn.getAttribute('data-theme');
+        state.theme = selected;
+        themeBtns.forEach(b => {
+          if (b.getAttribute('data-theme') === selected) {
+            b.className = 'theme-btn px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 font-medium';
+          } else {
+            b.className = 'theme-btn px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-medium';
+          }
+        });
+        requestRender();
+      });
+    });
+
+    // Victory Modal Buttons
+    modalBtnReplay.addEventListener('click', () => {
+      resetPlayerToEntrance();
+    });
+
+    modalBtnNew.addEventListener('click', () => {
+      generateMazeInstant();
+    });
+
+    // Responsive Canvas Resize Listener
+    window.addEventListener('resize', () => {
+      updateCanvasGeometry();
+    });
+
+    // Initialize Application on Load
+    window.onload = function () {
+      updateCanvasGeometry();
+      generateMazeInstant();
+    };
+  </script>
+</body>
+</html>
